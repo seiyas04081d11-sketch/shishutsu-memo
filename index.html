@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="支出メモ">
+<meta name="theme-color" content="#0f766e">
+<title>支出メモ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg:#f4f5f2; --card:#fff; --text:#1c1f1d; --muted:#6b726e; --line:#e3e6e2;
+    --accent:#0f766e; --accent-soft:#d6efe9; --warn:#c27a0e; --bad:#c9372c;
+    --need:#0f766e; --want:#c27a0e; --waste:#c9372c;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#141716; --card:#1e2221; --text:#e9ecea; --muted:#9aa29e; --line:#2e3432;
+      --accent:#3fb8a8; --accent-soft:#1d3a36; --warn:#e3a23b; --bad:#ef6a5e;
+      --need:#3fb8a8; --want:#e3a23b; --waste:#ef6a5e; }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif;
+    -webkit-tap-highlight-color:transparent}
+  body{padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+  header{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;justify-content:center;gap:12px;
+    padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
+  header h1{font-size:17px;margin:0;min-width:120px;text-align:center;font-weight:700}
+  header button{border:0;background:var(--card);color:var(--text);width:36px;height:36px;border-radius:50%;font-size:20px;cursor:pointer}
+  header button[hidden]{display:none}
+  main{max-width:560px;margin:0 auto;padding:0 14px}
+  .tab{display:none}.tab.active{display:block}
+  .card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px}
+  h2{font-size:14px;color:var(--muted);margin:18px 4px 8px;font-weight:600}
+  .muted{color:var(--muted)}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* summary */
+  .big{font-size:32px;font-weight:800;letter-spacing:.01em}
+  .sub{font-size:13px;color:var(--muted);margin-top:2px}
+  .bar{position:relative;height:10px;background:var(--line);border-radius:6px;overflow:visible;margin:12px 0 6px}
+  .bar > i{display:block;height:100%;border-radius:6px;background:var(--accent);max-width:100%}
+  .bar > b{position:absolute;top:-4px;width:2px;height:18px;background:var(--text);opacity:.45}
+  .today{display:flex;gap:10px;margin-top:14px}
+  .today > div{flex:1;background:var(--bg);border-radius:12px;padding:10px 12px}
+  .today .k{font-size:12px;color:var(--muted)} .today .v{font-size:20px;font-weight:700;margin-top:2px}
+
+  /* form */
+  .amount-row{display:flex;align-items:center;gap:6px;border-bottom:2px solid var(--line);padding-bottom:6px}
+  .amount-row span{font-size:26px;color:var(--muted)}
+  #amount{flex:1;border:0;background:transparent;color:var(--text);font-size:34px;font-weight:800;outline:none;width:100%;min-width:0}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+  .chip{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:999px;padding:8px 12px;font-size:14px;cursor:pointer}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .judge{display:flex;gap:8px}
+  .judge button{flex:1;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:10px 4px;font-size:14px;cursor:pointer}
+  .judge button.on[data-v=need]{background:var(--need);border-color:var(--need);color:#fff}
+  .judge button.on[data-v=want]{background:var(--want);border-color:var(--want);color:#fff}
+  .judge button.on[data-v=waste]{background:var(--waste);border-color:var(--waste);color:#fff}
+  .row{display:flex;gap:8px;margin-top:12px}
+  input[type=date],input[type=text],input[type=number],textarea{
+    border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:10px 12px;font-size:16px;font-family:inherit}
+  #date{flex:0 0 150px} #memo{flex:1;min-width:0}
+  .btns{display:flex;gap:8px;margin-top:14px}
+  .primary{flex:1;border:0;background:var(--accent);color:#fff;border-radius:14px;padding:14px;font-size:16px;font-weight:700;cursor:pointer}
+  .ghost{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:14px;padding:14px 16px;font-size:15px;cursor:pointer}
+  .danger{color:var(--bad);border-color:var(--bad)}
+  [hidden]{display:none !important}
+
+  /* list */
+  .list{list-style:none;margin:0;padding:0;background:var(--card);border-radius:16px;overflow:hidden}
+  .list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid var(--line);cursor:pointer}
+  .list li:first-child{border-top:0}
+  .list .l{min-width:0} .list .cat{font-size:15px}
+  .list .memo{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .list .r{text-align:right;flex-shrink:0}
+  .list .amt{font-weight:700;font-variant-numeric:tabular-nums}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;margin-left:6px;color:#fff;vertical-align:1px}
+  .tag.need{background:var(--need)} .tag.want{background:var(--want)} .tag.waste{background:var(--waste)}
+  .empty{padding:18px;text-align:center;color:var(--muted);font-size:14px;background:var(--card);border-radius:16px}
+  .dayhead{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin:16px 6px 6px}
+
+  /* stats */
+  .hbar{margin:10px 0}
+  .hbar .t{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}
+  .hbar .track{height:8px;background:var(--line);border-radius:5px}
+  .hbar .track i{display:block;height:100%;border-radius:5px;background:var(--accent)}
+  .stack{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--line);margin:10px 0}
+  .stack i{display:block;height:100%}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
+  .legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:var(--c)}
+  .days{position:relative;display:flex;align-items:flex-end;gap:2px;height:120px;margin-top:10px;border-bottom:1px solid var(--line)}
+  .days i{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:1px;opacity:.85}
+  .days i.over{background:var(--bad)}
+  .days .pace{position:absolute;left:0;right:0;border-top:1px dashed var(--muted)}
+  .axis{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px}
+
+  /* settings */
+  label.f{display:block;font-size:14px;margin-bottom:6px;font-weight:600}
+  textarea{width:100%;min-height:200px;line-height:1.6}
+  .setbtns{display:flex;flex-direction:column;gap:8px}
+  select{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:10px 8px;font-size:16px;font-family:inherit}
+  .lrow{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
+  .lrow > div{display:flex;gap:6px;align-items:center}
+  .lrow > div + div{margin-top:8px}
+  .lrow .lcat{flex:1;min-width:0}
+  .lrow .lval{width:90px}
+  .lrow .lx{border:0;background:transparent;color:var(--muted);font-size:20px;padding:4px 8px;cursor:pointer}
+
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;background:var(--card);border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom)}
+  nav button{flex:1;border:0;background:transparent;color:var(--muted);padding:9px 0 10px;font-size:11px;cursor:pointer}
+  nav button .ic{display:block;font-size:20px;margin-bottom:2px}
+  nav button.on{color:var(--accent);font-weight:700}
+
+  #toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+    background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<header>
+  <button id="prev" aria-label="前の月">‹</button>
+  <h1 id="title">今月</h1>
+  <button id="next" aria-label="次の月">›</button>
+</header>
+
+<main>
+  <!-- 記録 -->
+  <section id="tab-add" class="tab active">
+    <div class="card" id="summary"></div>
+    <div class="card" id="limits" hidden></div>
+    <div class="card" id="reviewNudge" hidden></div>
+
+    <form id="form" class="card" autocomplete="off">
+      <div class="amount-row"><span>¥</span><input id="amount" type="text" inputmode="numeric" placeholder="0"></div>
+      <div class="chips" id="cats"></div>
+      <div class="sub" id="catHint" style="margin:-4px 2px 12px" hidden></div>
+      <div class="judge" id="judge">
+        <button type="button" data-v="need">必要</button>
+        <button type="button" data-v="want">欲しかった</button>
+        <button type="button" data-v="waste">ムダだった</button>
+      </div>
+      <div class="row">
+        <input id="date" type="date">
+        <input id="memo" type="text" placeholder="メモ（任意）">
+      </div>
+      <div class="btns">
+        <button type="button" class="ghost danger" id="del" hidden>削除</button>
+        <button type="button" class="ghost" id="cancel" hidden>やめる</button>
+        <button type="submit" class="primary" id="submit">記録する</button>
+      </div>
+    </form>
+
+    <h2>今日の支出</h2>
+    <div id="todayList"></div>
+  </section>
+
+  <!-- 履歴 -->
+  <section id="tab-list" class="tab">
+    <div class="card" id="listHead"></div>
+    <div id="monthList"></div>
+  </section>
+
+  <!-- 分析 -->
+  <section id="tab-stats" class="tab">
+    <div class="card">
+      <div class="f" style="font-weight:700;margin-bottom:4px">🤖 AIに見てもらう</div>
+      <div class="sub">記録をまとめた文章をコピーします。Claudeのアプリに貼り付けて送ると、評価と対策を返してくれます。</div>
+      <div class="btns">
+        <button class="ghost" style="flex:1" data-review="week">今週の分</button>
+        <button class="primary" data-review="month">表示中の月の分</button>
+      </div>
+    </div>
+    <div id="stats"></div>
+  </section>
+
+  <!-- 設定 -->
+  <section id="tab-settings" class="tab">
+    <div class="card">
+      <label class="f" for="budget">1か月の予算（円）</label>
+      <input id="budget" type="number" inputmode="numeric" min="0" step="1000" style="width:100%">
+      <div class="sub">記録画面の「今日使っていい額」は、この予算の残りを月末までの日数で割って出しています。</div>
+    </div>
+    <div class="card">
+      <label class="f">カテゴリごとの枠</label>
+      <div id="limitRows"></div>
+      <button class="ghost" id="addLimit" style="width:100%;padding:10px">＋ 枠を追加</button>
+      <div class="sub">週は月曜はじまり。記録画面に「あと◯回」「あと¥◯」が出ます。</div>
+    </div>
+    <div class="card">
+      <label class="f" for="catsText">カテゴリ（1行に1つ）</label>
+      <textarea id="catsText"></textarea>
+      <div class="sub">名前を変えても、記録済みの支出のカテゴリはそのまま残ります。</div>
+    </div>
+    <div class="card setbtns">
+      <button class="ghost" id="exportCsv">CSVで書き出す（Excel・スプレッドシート用）</button>
+      <button class="ghost" id="exportJson">バックアップを書き出す</button>
+      <button class="ghost" id="importJson">バックアップから復元</button>
+      <input id="importFile" type="file" accept="application/json,.json" hidden>
+      <button class="ghost danger" id="wipe">すべてのデータを消す</button>
+      <div class="sub">データはこの端末のブラウザの中だけに保存されます。機種変更の前などはバックアップを書き出してください。</div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-tab="add" class="on"><span class="ic">✏️</span>記録</button>
+  <button data-tab="list"><span class="ic">📋</span>履歴</button>
+  <button data-tab="stats"><span class="ic">📊</span>分析</button>
+  <button data-tab="settings"><span class="ic">⚙️</span>設定</button>
+</nav>
+
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const KEY = 'shishutsu-memo-v1';
+const CONBINI = '🏪 コンビニ', FRIENDS = '🍻 友達とご飯';
+const DEFAULT_CATS = ['🍙 食費', CONBINI, FRIENDS, '☕ カフェ・おやつ','🚃 交通','⛰️ 登山・アウトドア','🎉 遊び','🧴 日用品','👕 服・美容','📚 本・学び','📦 その他'];
+// カテゴリごとの枠（period: week=月曜始まりの週 / month、unit: count=回数 / yen=金額）
+const DEFAULT_LIMITS = [
+  {cat:CONBINI, period:'week',  unit:'count', value:2},
+  {cat:FRIENDS, period:'month', unit:'yen',   value:10000},
+];
+const JUDGE = {need:'必要', want:'欲しかった', waste:'ムダ'};
+
+// ---------- データ ----------
+const fresh = () => ({items:[], budget:40000, cats:DEFAULT_CATS.slice(), limits:DEFAULT_LIMITS.map(L => ({...L}))});
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(KEY));
+    if (d && Array.isArray(d.items)){
+      const s = {...fresh(), ...d};
+      if (!Array.isArray(d.limits)){   // 枠のない古いデータ → 枠と2カテゴリを足す
+        s.limits = DEFAULT_LIMITS.map(L => ({...L}));
+        [CONBINI, FRIENDS].forEach(c => { if (!s.cats.includes(c)) s.cats.unshift(c); });
+      }
+      return s;
+    }
+  }catch(e){}
+  return fresh();
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(S)); }
+let S = load();
+
+// ---------- 日付・数値の小道具 ----------
+const pad = n => String(n).padStart(2,'0');
+const ds = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const todayStr = () => ds(new Date());
+const ymOf = s => s.slice(0,7);
+const thisYm = () => ymOf(todayStr());
+const yen = n => (n < 0 ? '-¥' : '¥') + Math.abs(Math.round(n)).toLocaleString('ja-JP');
+const daysIn = ym => { const [y,m] = ym.split('-').map(Number); return new Date(y,m,0).getDate(); };
+const shiftYm = (ym,k) => { const [y,m] = ym.split('-').map(Number); const d = new Date(y,m-1+k,1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; };
+const ymLabel = ym => { const [y,m] = ym.split('-').map(Number); return `${y}年${m}月`; };
+const sum = a => a.reduce((s,i) => s + i.amount, 0);
+const itemsOf = ym => S.items.filter(i => ymOf(i.date) === ym);
+const byNewest = (a,b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+
+let view = thisYm();             // 履歴・分析で見ている月
+let tab = 'add';
+let sel = {cat:null, judge:'need', editing:null};
+
+// ---------- 枠 ----------
+function weekRange(){
+  const d = new Date(), k = (d.getDay() + 6) % 7;   // 月曜=0
+  const s = new Date(d.getFullYear(), d.getMonth(), d.getDate() - k);
+  const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6);
+  return [ds(s), ds(e)];
+}
+const limitOf = cat => (S.limits || []).find(L => L.cat === cat && L.value > 0);
+const fmtL = (L,n) => L.unit === 'count' ? `${n}回` : yen(n);
+const perLabel = L => L.period === 'week' ? '今週' : '今月';
+function limitStatus(L){
+  let its;
+  if (L.period === 'week'){ const [s,e] = weekRange(); its = S.items.filter(i => i.cat === L.cat && i.date >= s && i.date <= e); }
+  else its = itemsOf(thisYm()).filter(i => i.cat === L.cat);
+  const used = L.unit === 'count' ? its.length : sum(its);
+  const left = L.value - used;
+  const color = left < 0 ? 'var(--bad)' : left === 0 || used / L.value >= 0.75 ? 'var(--warn)' : 'var(--accent)';
+  const leftText = left > 0 ? `あと${fmtL(L,left)}` : left === 0 ? '使い切り' : `${fmtL(L,-left)}オーバー`;
+  return {used, left, color, leftText, ratio: used / L.value};
+}
+function renderLimits(){
+  const Ls = (S.limits || []).filter(L => L.value > 0);
+  $('#limits').hidden = !Ls.length;
+  $('#limits').innerHTML = `<div class="sub">決めた枠</div>` + Ls.map(L => {
+    const st = limitStatus(L);
+    return `<div class="hbar"><div class="t"><span>${esc(L.cat)}</span>
+      <span class="num"><span class="muted">${perLabel(L)} ${fmtL(L,st.used)}/${fmtL(L,L.value)}</span> <b style="color:${st.color}">${st.leftText}</b></span></div>
+      <div class="track"><i style="width:${Math.min(st.ratio,1)*100}%;background:${st.color}"></i></div></div>`;
+  }).join('');
+}
+function renderCatHint(){
+  const L = sel.cat && limitOf(sel.cat), h = $('#catHint');
+  if (!L){ h.hidden = true; return; }
+  const st = limitStatus(L);
+  h.hidden = false;
+  h.innerHTML = !sel.editing && st.left <= 0 && L.unit === 'count'
+    ? `<b style="color:var(--bad)">${perLabel(L)}の${esc(L.cat)}は使い切っています。本当に寄る？</b>`
+    : !sel.editing && st.left <= 0
+    ? `<b style="color:var(--bad)">${perLabel(L)}の${esc(L.cat)}の枠を${st.left < 0 ? '超えています' : '使い切っています'}。本当に使う？</b>`
+    : `${esc(L.cat)}：${perLabel(L)} ${fmtL(L,st.used)}/${fmtL(L,L.value)}・<b style="color:${st.color}">${st.leftText}</b>`;
+}
+
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ---------- 記録画面 ----------
+function renderSummary(){
+  const ym = thisYm(), its = itemsOf(ym), tot = sum(its), b = Number(S.budget) || 0;
+  const today = todayStr(), now = new Date();
+  const todayTot = sum(its.filter(i => i.date === today));
+  const dleft = daysIn(ym) - now.getDate() + 1;
+  const waste = its.filter(i => i.judge === 'waste');
+  const wasteTot = sum(waste);
+  let html = `<div class="sub">${ymLabel(ym)}の支出</div><div class="big num">${yen(tot)}</div>`;
+  if (b > 0){
+    const ratio = tot / b, pace = (now.getDate() - 1 + 0.5) / daysIn(ym);
+    const color = ratio > 1 ? 'var(--bad)' : ratio > pace ? 'var(--warn)' : 'var(--accent)';
+    const remain = b - tot;
+    // 今日の朝の時点での残りを、今日を含む残り日数で割る
+    const perDay = (b - (tot - todayTot)) / dleft;
+    const todayLeft = perDay - todayTot;
+    html += `
+      <div class="bar"><i style="width:${Math.min(ratio,1)*100}%;background:${color}"></i><b style="left:${pace*100}%"></b></div>
+      <div class="sub num">予算 ${yen(b)}・${remain >= 0 ? `残り ${yen(remain)}` : `<span style="color:var(--bad)">${yen(-remain)} オーバー</span>`}
+        ${ratio > pace && ratio <= 1 ? '・<span style="color:var(--warn)">ペース速め</span>' : ''}</div>
+      <div class="today">
+        <div><div class="k">今日使っていい額</div><div class="v num" style="color:${perDay < 0 ? 'var(--bad)' : 'inherit'}">${yen(Math.max(perDay,0))}</div></div>
+        <div><div class="k">今日あと</div><div class="v num" style="color:${todayLeft < 0 ? 'var(--bad)' : 'inherit'}">${yen(todayLeft)}</div></div>
+      </div>`;
+  }
+  if (waste.length) html += `<div class="sub" style="margin-top:12px">今月の「ムダだった」：<b style="color:var(--waste)">${yen(wasteTot)}</b>（${waste.length}件）</div>`;
+  $('#summary').innerHTML = html;
+}
+
+function renderCats(){
+  if (sel.cat && !S.cats.includes(sel.cat) && !sel.editing) sel.cat = null;
+  const list = S.cats.slice();
+  if (sel.cat && !list.includes(sel.cat)) list.push(sel.cat);   // 編集中の古いカテゴリも選べるように
+  $('#cats').innerHTML = list.map((c,k) => `<button type="button" class="chip${c === sel.cat ? ' on' : ''}" data-i="${k}">${esc(c)}</button>`).join('');
+  $('#cats').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; sel.cat = list[b.dataset.i]; renderCats(); };
+  renderCatHint();
+}
+function renderJudge(){
+  document.querySelectorAll('#judge button').forEach(b => b.classList.toggle('on', b.dataset.v === sel.judge));
+}
+$('#judge').onclick = e => { const b = e.target.closest('button'); if (!b) return; sel.judge = b.dataset.v; renderJudge(); };
+
+function itemLi(i){
+  return `<li data-id="${i.id}">
+    <div class="l"><span class="cat">${esc(i.cat)}</span>${i.memo ? `<span class="memo">${esc(i.memo)}</span>` : ''}</div>
+    <div class="r"><span class="amt">${yen(i.amount)}</span><span class="tag ${i.judge}">${JUDGE[i.judge]}</span></div>
+  </li>`;
+}
+function listHtml(items, emptyMsg){
+  return items.length ? `<ul class="list">${items.map(itemLi).join('')}</ul>` : `<div class="empty">${emptyMsg}</div>`;
+}
+function renderToday(){
+  const its = S.items.filter(i => i.date === todayStr()).sort(byNewest);
+  $('#todayList').innerHTML = listHtml(its, 'まだ記録がありません');
+}
+
+function resetForm(){
+  sel = {cat:null, judge:'need', editing:null};
+  $('#amount').value = ''; $('#memo').value = ''; $('#date').value = todayStr();
+  $('#submit').textContent = '記録する'; $('#del').hidden = true; $('#cancel').hidden = true;
+  renderCats(); renderJudge();
+}
+function startEdit(id){
+  const it = S.items.find(i => i.id === id); if (!it) return;
+  sel = {cat:it.cat, judge:it.judge, editing:id};
+  $('#amount').value = it.amount.toLocaleString('ja-JP'); $('#memo').value = it.memo || ''; $('#date').value = it.date;
+  $('#submit').textContent = '更新する'; $('#del').hidden = false; $('#cancel').hidden = false;
+  renderCats(); renderJudge(); switchTab('add');
+  $('#form').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+$('#amount').addEventListener('input', e => {   // 3桁区切りで表示
+  const n = e.target.value.replace(/[^\d]/g,'');
+  e.target.value = n ? Number(n).toLocaleString('ja-JP') : '';
+});
+
+$('#form').onsubmit = e => {
+  e.preventDefault();
+  const amount = parseInt($('#amount').value.replace(/[^\d]/g,''), 10);
+  if (!amount){ toast('金額を入れてください'); $('#amount').focus(); return; }
+  if (!sel.cat){ toast('カテゴリを選んでください'); return; }
+  const it = {id: sel.editing || newId(), date: $('#date').value || todayStr(), amount, cat: sel.cat, judge: sel.judge, memo: $('#memo').value.trim()};
+  const editing = !!sel.editing, now = new Date();
+  // 記録した時刻（AIの分析で「帰り道」「夜」などの傾向を見るため。編集では元の時刻を残す）
+  it.time = editing ? (S.items.find(i => i.id === it.id) || {}).time : `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  if (editing){ const k = S.items.findIndex(i => i.id === it.id); if (k >= 0) S.items[k] = it; }
+  else S.items.push(it);
+  save(); resetForm(); renderAll();
+  const b = Number(S.budget) || 0, remain = b - sum(itemsOf(thisYm())), L = limitOf(it.cat);
+  toast(editing ? '更新しました'
+    : L ? `記録しました（${it.cat.replace(/^\S+\s/,'')} ${perLabel(L)}${limitStatus(L).leftText}）`
+    : b > 0 ? `記録しました（今月の残り ${yen(remain)}）` : '記録しました');
+};
+$('#cancel').onclick = resetForm;
+$('#del').onclick = () => {
+  if (!sel.editing || !confirm('この支出を削除しますか？')) return;
+  S.items = S.items.filter(i => i.id !== sel.editing);
+  save(); resetForm(); renderAll(); toast('削除しました');
+};
+document.addEventListener('click', e => {
+  const li = e.target.closest('.list li'); if (li) startEdit(li.dataset.id);
+});
+
+// ---------- 履歴 ----------
+function renderList(){
+  const its = itemsOf(view).sort(byNewest), tot = sum(its);
+  $('#listHead').innerHTML = `<div class="sub">${ymLabel(view)}の合計（${its.length}件）</div><div class="big num">${yen(tot)}</div>`;
+  if (!its.length){ $('#monthList').innerHTML = '<div class="empty">この月の記録はありません</div>'; return; }
+  const days = {};
+  its.forEach(i => (days[i.date] ||= []).push(i));
+  const wd = '日月火水木金土';
+  $('#monthList').innerHTML = Object.keys(days).sort().reverse().map(d => {
+    const dt = new Date(d + 'T00:00');
+    return `<div class="dayhead"><span>${dt.getMonth()+1}/${dt.getDate()}（${wd[dt.getDay()]}）</span><span class="num">${yen(sum(days[d]))}</span></div>${listHtml(days[d])}`;
+  }).join('');
+}
+
+// ---------- 分析 ----------
+function renderStats(){
+  const its = itemsOf(view), tot = sum(its), prev = sum(itemsOf(shiftYm(view,-1)));
+  if (!its.length){ $('#stats').innerHTML = '<div class="empty">この月の記録はありません</div>'; return; }
+  let h = '';
+
+  // 合計と先月比
+  const diff = tot - prev;
+  h += `<div class="card"><div class="sub">${ymLabel(view)}の合計</div><div class="big num">${yen(tot)}</div>
+    <div class="sub num">${prev ? `先月 ${yen(prev)}（${diff >= 0 ? '<span style="color:var(--bad)">+' + yen(diff) + '</span>' : '<span style="color:var(--accent)">' + yen(diff) + '</span>'}）` : '先月の記録なし'}</div></div>`;
+
+  // 必要 / 欲しかった / ムダ
+  const jt = {need:0, want:0, waste:0}; its.forEach(i => jt[i.judge] += i.amount);
+  h += `<h2>使い方の内訳</h2><div class="card">
+    <div class="stack">${['need','want','waste'].map(k => `<i style="width:${jt[k]/tot*100}%;background:var(--${k})"></i>`).join('')}</div>
+    <div class="legend num">${['need','want','waste'].map(k => `<span style="--c:var(--${k})">${JUDGE[k]} ${yen(jt[k])}（${Math.round(jt[k]/tot*100)}%）</span>`).join('')}</div>
+  </div>`;
+
+  // カテゴリ別
+  const bc = {}; its.forEach(i => bc[i.cat] = (bc[i.cat] || 0) + i.amount);
+  const rows = Object.entries(bc).sort((a,b) => b[1] - a[1]), max = rows[0][1];
+  h += `<h2>カテゴリ別</h2><div class="card">${rows.map(([c,v]) => `
+    <div class="hbar"><div class="t"><span>${esc(c)}</span><span class="num">${yen(v)} <span class="muted">${Math.round(v/tot*100)}%</span></span></div>
+    <div class="track"><i style="width:${v/max*100}%"></i></div></div>`).join('')}</div>`;
+
+  // 日別
+  const n = daysIn(view), daily = Array(n).fill(0);
+  its.forEach(i => daily[Number(i.date.slice(8,10)) - 1] += i.amount);
+  const b = Number(S.budget) || 0, pace = b / n, dmax = Math.max(...daily, pace, 1);
+  h += `<h2>日別</h2><div class="card">
+    <div class="days">${daily.map(v => `<i class="${b && v > pace ? 'over' : ''}" style="height:${v/dmax*100}%"></i>`).join('')}
+      ${b ? `<div class="pace" style="bottom:${pace/dmax*100}%"></div>` : ''}</div>
+    <div class="axis"><span>1日</span><span>${Math.ceil(n/2)}日</span><span>${n}日</span></div>
+    ${b ? `<div class="sub" style="margin-top:8px">点線＝予算どおりの1日あたり ${yen(pace)}。赤い日はそれを超えた日です。</div>` : ''}
+  </div>`;
+
+  // ムダだった支出ランキング
+  const waste = its.filter(i => i.judge === 'waste').sort((a,b) => b.amount - a.amount).slice(0,5);
+  if (waste.length){
+    h += `<h2>「ムダだった」の大きい順</h2>${listHtml(waste)}`;
+  }
+  $('#stats').innerHTML = h;
+}
+
+// ---------- AIに見てもらう ----------
+const WD = '日月火水木金土';
+function reviewText(kind){
+  let its, label, prevIts, prevLabel;
+  if (kind === 'week'){
+    const [s,e] = weekRange();
+    const ps = ds(new Date(new Date(s + 'T00:00').getTime() - 7*864e5)), pe = ds(new Date(new Date(s + 'T00:00').getTime() - 864e5));
+    its = S.items.filter(i => i.date >= s && i.date <= e);
+    prevIts = S.items.filter(i => i.date >= ps && i.date <= pe);
+    label = `今週（${s}〜${e}）`; prevLabel = '先週';
+  } else {
+    its = itemsOf(view); prevIts = itemsOf(shiftYm(view,-1));
+    label = ymLabel(view) + (view === thisYm() ? `（今日は${new Date().getDate()}日／${daysIn(view)}日）` : '');
+    prevLabel = '前の月';
+  }
+  its = its.slice().sort((a,b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
+  const tot = sum(its), jt = {need:0, want:0, waste:0}, bc = {};
+  its.forEach(i => { jt[i.judge] += i.amount; bc[i.cat] = (bc[i.cat] || 0) + i.amount; });
+  const lines = [];
+  lines.push('あなたは私の家計コーチです。下の支出記録を見て、使いすぎを直すための評価と助言をください。');
+  lines.push('私は大学生で、とくに「ふらっと寄るコンビニ」と「友達とのご飯」で使いすぎる自覚があります。');
+  lines.push('');
+  lines.push('お願いしたいこと（短く、具体的に）:');
+  lines.push('1. 全体の評価（予算と枠に対してどうだったか。良かった点も）');
+  lines.push('2. お金が漏れているパターン（曜日・時間帯・カテゴリ・「ムダ」がついた支出の共通点）');
+  lines.push('3. 次の期間にやる具体的な対策を3つまで（枠の数字を変えるべきなら提案も）');
+  lines.push('');
+  lines.push(`【期間】${label}`);
+  lines.push(`【合計】${yen(tot)}（${its.length}件）／${prevLabel} ${yen(sum(prevIts))}`);
+  if (S.budget) lines.push(`【月の予算】${yen(S.budget)}（今月ここまで ${yen(sum(itemsOf(thisYm())))}）`);
+  const Ls = (S.limits || []).filter(L => L.value > 0);
+  if (Ls.length) lines.push('【自分で決めた枠】' + Ls.map(L => { const st = limitStatus(L); return `${L.cat} ${L.period === 'week' ? '週' : '月'}${fmtL(L,L.value)}まで → ${perLabel(L)} ${fmtL(L,st.used)}`; }).join('／'));
+  lines.push(`【必要・欲しかった・ムダ】必要 ${yen(jt.need)}／欲しかった ${yen(jt.want)}／ムダ ${yen(jt.waste)}`);
+  lines.push('【カテゴリ別】' + Object.entries(bc).sort((a,b) => b[1]-a[1]).map(([c,v]) => `${c} ${yen(v)}`).join('／'));
+  lines.push('');
+  lines.push('【明細】日付(曜日) 時刻 金額 カテゴリ 判定 メモ');
+  its.forEach(i => {
+    const d = new Date(i.date + 'T00:00');
+    lines.push(`${i.date.slice(5)}(${WD[d.getDay()]}) ${i.time || '--:--'} ${yen(i.amount)} ${i.cat} ${JUDGE[i.judge]}${i.memo ? ' ' + i.memo : ''}`);
+  });
+  if (!its.length) lines.push('（この期間の記録なし）');
+  return lines.join('\n');
+}
+async function copyReview(kind){
+  if (kind === 'thismonth'){ view = thisYm(); kind = 'month'; renderAll(); }   // 月末のお知らせからは今月の分
+  const text = reviewText(kind);
+  try{ await navigator.clipboard.writeText(text); }
+  catch(e){   // クリップボードが使えないときは選択状態で見せる
+    const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+    try{ document.execCommand('copy'); } catch(_){} t.remove();
+  }
+  S.lastReview = todayStr(); save(); renderNudge();
+  if (confirm('コピーしました。Claudeを開いて貼り付けますか？')) location.href = 'https://claude.ai/new';
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-review]'); if (b) copyReview(b.dataset.review); });
+
+// 日曜は週のふりかえり、月末は月のふりかえりを促す
+function renderNudge(){
+  const d = new Date(), last = d.getDate() === daysIn(thisYm()), sunday = d.getDay() === 0;
+  const box = $('#reviewNudge');
+  if ((!last && !sunday) || S.lastReview === todayStr()){ box.hidden = true; return; }
+  const kind = last ? 'thismonth' : 'week';
+  box.hidden = false;
+  box.innerHTML = `<div style="font-weight:700">🤖 ${last ? '今日は月末' : '今日は日曜日'}。ふりかえりの日です</div>
+    <div class="sub">記録をコピーしてClaudeに見てもらいましょう。</div>
+    <div class="btns"><button class="primary" data-review="${kind}">${last ? '今月の分' : '今週の分'}をコピー</button></div>`;
+}
+
+// ---------- 設定 ----------
+function renderSettings(){
+  $('#budget').value = S.budget || '';
+  $('#catsText').value = S.cats.join('\n');
+  const opt = (v,t,cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(t)}</option>`;
+  $('#limitRows').innerHTML = (S.limits || []).map((L,k) => {
+    const cats = S.cats.includes(L.cat) ? S.cats : [L.cat, ...S.cats];
+    return `<div class="lrow" data-k="${k}">
+      <div><select class="lcat">${cats.map(c => opt(c,c,L.cat)).join('')}</select><button type="button" class="lx" aria-label="この枠を消す">×</button></div>
+      <div><select class="lper">${opt('week','1週間に',L.period)}${opt('month','1か月に',L.period)}</select>
+        <input class="lval" type="number" inputmode="numeric" min="0" value="${L.value}">
+        <select class="lunit">${opt('count','回まで',L.unit)}${opt('yen','円まで',L.unit)}</select></div>
+    </div>`;
+  }).join('');
+}
+function readLimitRows(){
+  S.limits = [...document.querySelectorAll('#limitRows .lrow')].map(r => ({
+    cat: r.querySelector('.lcat').value, period: r.querySelector('.lper').value,
+    unit: r.querySelector('.lunit').value, value: Math.max(0, parseInt(r.querySelector('.lval').value,10) || 0),
+  }));
+  save(); renderAll();
+}
+$('#limitRows').onchange = () => { readLimitRows(); toast('枠を保存しました'); };
+$('#limitRows').onclick = e => {
+  const x = e.target.closest('.lx'); if (!x) return;
+  x.closest('.lrow').remove(); readLimitRows(); toast('枠を消しました');
+};
+$('#addLimit').onclick = () => {
+  const used = new Set((S.limits || []).map(L => L.cat));
+  S.limits = [...(S.limits || []), {cat: S.cats.find(c => !used.has(c)) || S.cats[0], period:'month', unit:'yen', value:5000}];
+  save(); renderAll();
+};
+$('#budget').onchange = e => { S.budget = Math.max(0, parseInt(e.target.value,10) || 0); save(); renderAll(); toast('予算を保存しました'); };
+$('#catsText').onchange = e => {
+  const cats = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+  S.cats = cats.length ? [...new Set(cats)] : DEFAULT_CATS.slice();
+  save(); renderAll(); toast('カテゴリを保存しました');
+};
+function download(name, text, type){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type}));
+  a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+$('#exportCsv').onclick = () => {
+  const q = s => `"${String(s).replace(/"/g,'""')}"`;
+  const lines = ['日付,金額,カテゴリ,判定,メモ', ...S.items.slice().sort((a,b) => a.date.localeCompare(b.date))
+    .map(i => [i.date, i.amount, q(i.cat), JUDGE[i.judge], q(i.memo || '')].join(','))];
+  download(`支出メモ_${todayStr()}.csv`, '﻿' + lines.join('\r\n'), 'text/csv');
+};
+$('#exportJson').onclick = () => download(`支出メモ_バックアップ_${todayStr()}.json`, JSON.stringify(S, null, 1), 'application/json');
+$('#importJson').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try{
+    const d = JSON.parse(await f.text());
+    if (!Array.isArray(d.items)) throw 0;
+    if (!confirm(`${d.items.length}件のデータで今のデータを置き換えます。よろしいですか？`)) return;
+    S = {...fresh(), ...d}; save(); resetForm(); renderAll(); toast('復元しました');
+  }catch(err){ toast('読み込めないファイルです'); }
+  e.target.value = '';
+};
+$('#wipe').onclick = () => {
+  if (!confirm('すべての記録を消します。元に戻せません。よろしいですか？')) return;
+  S = {...S, items:[]}; save(); resetForm(); renderAll(); toast('消去しました');
+};
+
+// ---------- タブ・月切り替え ----------
+function switchTab(t){
+  tab = t;
+  document.querySelectorAll('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + t));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  renderHeader(); window.scrollTo(0,0);
+}
+function renderHeader(){
+  const monthly = tab === 'list' || tab === 'stats';
+  $('#prev').hidden = $('#next').hidden = !monthly;
+  $('#title').textContent = monthly ? ymLabel(view) : tab === 'add' ? '支出メモ' : '設定';
+  $('#next').style.visibility = view >= thisYm() ? 'hidden' : 'visible';
+}
+document.querySelector('nav').onclick = e => { const b = e.target.closest('button'); if (b) switchTab(b.dataset.tab); };
+$('#prev').onclick = () => { view = shiftYm(view,-1); renderAll(); };
+$('#next').onclick = () => { if (view < thisYm()){ view = shiftYm(view,1); renderAll(); } };
+
+function renderAll(){ renderHeader(); renderSummary(); renderLimits(); renderNudge(); renderCatHint(); renderToday(); renderList(); renderStats(); renderSettings(); }
+
+resetForm(); renderAll();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
