@@ -1,6 +1,6 @@
 // オフラインでも開けるようにするための Service Worker。
 // 中身を更新したら VERSION を上げる。
-const VERSION = 'v1';
+const VERSION = 'v2';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -11,6 +11,62 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script>
+// 見た目（色テーマ・フォント）。描画前に当てて、ちらつきを防ぐ。設定はこの端末だけに保存。
+const THEMES = {
+  auto:     {name:'自動'},   // ミント。明るい/暗いは端末の設定に合わせる
+  mint:     {name:'ミント',     dark:0, bg:'#f4f5f2', card:'#ffffff', text:'#1c1f1d', accent:'#0f766e'},
+  sky:      {name:'スカイ',     dark:0, bg:'#eef4fb', card:'#ffffff', text:'#1a2433', accent:'#2563eb'},
+  sakura:   {name:'サクラ',     dark:0, bg:'#fbf3f5', card:'#ffffff', text:'#33212a', accent:'#d9487a'},
+  lavender: {name:'ラベンダー', dark:0, bg:'#f4f2fb', card:'#ffffff', text:'#26213a', accent:'#7c5cdb'},
+  matcha:   {name:'抹茶',       dark:0, bg:'#f2f5ec', card:'#ffffff', text:'#222a1c', accent:'#5b8a2e'},
+  paper:    {name:'ペーパー',   dark:0, bg:'#f6f3ee', card:'#fffdf9', text:'#2a2520', accent:'#b5532c'},
+  midnight: {name:'ミッドナイト', dark:1, bg:'#0f1420', card:'#1a2130', text:'#e8edf5', accent:'#5ec8f2'},
+  forest:   {name:'フォレスト', dark:1, bg:'#0f1a16', card:'#18261f', text:'#e6eee9', accent:'#e2b857'},
+  ocean:    {name:'オーシャン', dark:1, bg:'#0b1a1c', card:'#132729', text:'#e2f0ef', accent:'#3dd6c4'},
+  wine:     {name:'ワイン',     dark:1, bg:'#1a0f14', card:'#261820', text:'#f3e6eb', accent:'#e0607e'},
+  mono:     {name:'モノクロ',   dark:1, bg:'#0b0b0b', card:'#1a1a1a', text:'#f2f2f2', accent:'#f2f2f2'},
+};
+const FONTS = {
+  system:  {name:'標準',       css:'', family:''},
+  modern:  {name:'モダン',     css:'family=Space+Grotesk:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700',
+            family:'"Space Grotesk","Zen Kaku Gothic New",sans-serif'},
+  round:   {name:'まるみ',     css:'family=Nunito:wght@600;800&family=M+PLUS+Rounded+1c:wght@400;500;700',
+            family:'Nunito,"M PLUS Rounded 1c",sans-serif'},
+  classic: {name:'クラシック', css:'family=Playfair+Display:wght@600;700&family=Shippori+Mincho:wght@400;600;700',
+            family:'"Playfair Display","Shippori Mincho",serif'},
+};
+const LOOK_KEY = 'shishutsu-memo-look';
+function loadLook(){
+  let v = {}; try{ v = JSON.parse(localStorage.getItem(LOOK_KEY)) || {}; }catch(e){}
+  return {theme: THEMES[v.theme] ? v.theme : 'auto', font: FONTS[v.font] ? v.font : 'system'};
+}
+function applyLook(look){
+  const st = document.documentElement.style, t = THEMES[look.theme];
+  const props = ['--bg','--card','--text','--muted','--line','--accent','--need','--on-accent','--warn','--want','--bad','--waste'];
+  props.forEach(p => st.removeProperty(p));
+  if (t.bg){
+    const warn = t.dark ? '#e3a23b' : '#c27a0e', bad = t.dark ? '#ef6a5e' : '#c9372c';
+    const set = {'--bg':t.bg, '--card':t.card, '--text':t.text, '--accent':t.accent, '--need':t.accent,
+      '--muted':`color-mix(in srgb, ${t.text} 58%, ${t.bg})`, '--line':`color-mix(in srgb, ${t.text} 13%, ${t.bg})`,
+      '--on-accent': t.dark ? t.bg : '#fff', '--warn':warn, '--want':warn, '--bad':bad, '--waste':bad};
+    Object.entries(set).forEach(([k,v]) => st.setProperty(k, v));
+  }
+  const f = FONTS[look.font];
+  if (f.family) st.setProperty('--font', f.family); else st.removeProperty('--font');
+  let link = document.getElementById('fontLink');
+  if (f.css){
+    if (!link){ link = document.createElement('link'); link.id = 'fontLink'; link.rel = 'stylesheet'; document.head.appendChild(link); }
+    link.href = `https://fonts.googleapis.com/css2?${f.css}&display=swap`;
+  } else if (link) link.remove();
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = t.bg || '#0f766e';
+}
+function saveLook(look){ try{ localStorage.setItem(LOOK_KEY, JSON.stringify(look)); }catch(e){} applyLook(look); }
+applyLook(loadLook());
+</script>
 <style>
   :root{
     --bg:#f4f5f2; --card:#fff; --text:#1c1f1d; --muted:#6b726e; --line:#e3e6e2;
@@ -22,10 +78,12 @@
       --accent:#3fb8a8; --accent-soft:#1d3a36; --warn:#e3a23b; --bad:#ef6a5e;
       --need:#3fb8a8; --want:#e3a23b; --waste:#ef6a5e; }
   }
+  :root{ --on-accent:#fff;
+    --font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif; }
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif;
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);
     -webkit-tap-highlight-color:transparent}
+  button,input,select,textarea{font-family:inherit}
   body{padding-bottom:calc(72px + env(safe-area-inset-bottom))}
   header{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;justify-content:center;gap:12px;
     padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
@@ -55,10 +113,10 @@
   #amount{flex:1;border:0;background:transparent;color:var(--text);font-size:34px;font-weight:800;outline:none;width:100%;min-width:0}
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
   .chip{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:999px;padding:8px 12px;font-size:14px;cursor:pointer}
-  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
   .judge{display:flex;gap:8px}
   .judge button{flex:1;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:10px 4px;font-size:14px;cursor:pointer}
-  .judge button.on[data-v=need]{background:var(--need);border-color:var(--need);color:#fff}
+  .judge button.on[data-v=need]{background:var(--need);border-color:var(--need);color:var(--on-accent)}
   .judge button.on[data-v=want]{background:var(--want);border-color:var(--want);color:#fff}
   .judge button.on[data-v=waste]{background:var(--waste);border-color:var(--waste);color:#fff}
   .row{display:flex;gap:8px;margin-top:12px}
@@ -66,7 +124,7 @@
     border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:10px 12px;font-size:16px;font-family:inherit}
   #date{flex:0 0 150px} #memo{flex:1;min-width:0}
   .btns{display:flex;gap:8px;margin-top:14px}
-  .primary{flex:1;border:0;background:var(--accent);color:#fff;border-radius:14px;padding:14px;font-size:16px;font-weight:700;cursor:pointer}
+  .primary{flex:1;border:0;background:var(--accent);color:var(--on-accent);border-radius:14px;padding:14px;font-size:16px;font-weight:700;cursor:pointer}
   .ghost{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:14px;padding:14px 16px;font-size:15px;cursor:pointer}
   .danger{color:var(--bad);border-color:var(--bad)}
   [hidden]{display:none !important}
@@ -80,7 +138,7 @@
   .list .r{text-align:right;flex-shrink:0}
   .list .amt{font-weight:700;font-variant-numeric:tabular-nums}
   .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;margin-left:6px;color:#fff;vertical-align:1px}
-  .tag.need{background:var(--need)} .tag.want{background:var(--want)} .tag.waste{background:var(--waste)}
+  .tag.need{background:var(--need);color:var(--on-accent)} .tag.want{background:var(--want)} .tag.waste{background:var(--waste)}
   .empty{padding:18px;text-align:center;color:var(--muted);font-size:14px;background:var(--card);border-radius:16px}
   .dayhead{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin:16px 6px 6px}
 
@@ -103,6 +161,15 @@
   label.f{display:block;font-size:14px;margin-bottom:6px;font-weight:600}
   textarea{width:100%;min-height:200px;line-height:1.6}
   .setbtns{display:flex;flex-direction:column;gap:8px}
+  .swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0 16px}
+  .sw{border:2px solid transparent;background:transparent;color:var(--text);border-radius:14px;padding:6px 2px;font-size:11px;cursor:pointer}
+  .sw.on{border-color:var(--accent)}
+  .sw .dot{display:block;width:40px;height:40px;margin:0 auto 4px;border-radius:50%;border:1px solid var(--line);
+    background:linear-gradient(135deg,var(--b) 50%,var(--a) 50%)}
+  .fonts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .fontbtn{border:2px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:10px;text-align:left;cursor:pointer}
+  .fontbtn.on{border-color:var(--accent)}
+  .fontbtn b{display:block;font-size:20px} .fontbtn span{font-size:12px;color:var(--muted)}
   select{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:10px 8px;font-size:16px;font-family:inherit}
   .lrow{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
   .lrow > div{display:flex;gap:6px;align-items:center}
@@ -182,6 +249,13 @@
 
   <!-- 設定 -->
   <section id="tab-settings" class="tab">
+    <div class="card">
+      <label class="f">見た目</label>
+      <div class="sub">色</div>
+      <div class="swatches" id="themePick"></div>
+      <div class="sub">フォント</div>
+      <div class="fonts" id="fontPick"></div>
+    </div>
     <div class="card">
       <label class="f" for="budget">1か月の予算（円）</label>
       <input id="budget" type="number" inputmode="numeric" min="0" step="1000" style="width:100%">
@@ -549,6 +623,7 @@ function renderNudge(){
 function renderSettings(){
   $('#budget').value = S.budget || '';
   $('#catsText').value = S.cats.join('\n');
+  if (tab === 'settings') renderLook();
   const opt = (v,t,cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(t)}</option>`;
   $('#limitRows').innerHTML = (S.limits || []).map((L,k) => {
     const cats = S.cats.includes(L.cat) ? S.cats : [L.cat, ...S.cats];
@@ -560,6 +635,23 @@ function renderSettings(){
     </div>`;
   }).join('');
 }
+function renderLook(){
+  const look = loadLook();
+  if (!document.getElementById('fontPreview')){   // 見本を実際のフォントで見せるため、全フォントを読み込む
+    const l = document.createElement('link'); l.id = 'fontPreview'; l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?' + Object.values(FONTS).filter(f => f.css).map(f => f.css).join('&') + '&display=swap';
+    document.head.appendChild(l);
+  }
+  $('#themePick').innerHTML = Object.entries(THEMES).map(([k,t]) => {
+    const style = t.bg ? `--b:${t.bg};--a:${t.accent}` : `--b:#f4f5f2;--a:#141716`;
+    return `<button class="sw${k === look.theme ? ' on' : ''}" data-theme="${k}"><span class="dot" style="${style}"></span>${t.name}</button>`;
+  }).join('');
+  $('#fontPick').innerHTML = Object.entries(FONTS).map(([k,f]) =>
+    `<button class="fontbtn${k === look.font ? ' on' : ''}" data-font="${k}" style="font-family:${f.family ? f.family.replace(/"/g,"'") : 'inherit'}"><b>¥1,280</b><span>${f.name}・今日の支出</span></button>`).join('');
+}
+$('#themePick').onclick = e => { const b = e.target.closest('[data-theme]'); if (!b) return; saveLook({...loadLook(), theme:b.dataset.theme}); renderLook(); };
+$('#fontPick').onclick = e => { const b = e.target.closest('[data-font]'); if (!b) return; saveLook({...loadLook(), font:b.dataset.font}); renderLook(); };
+
 function readLimitRows(){
   S.limits = [...document.querySelectorAll('#limitRows .lrow')].map(r => ({
     cat: r.querySelector('.lcat').value, period: r.querySelector('.lper').value,
@@ -617,6 +709,7 @@ function switchTab(t){
   tab = t;
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + t));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  if (t === 'settings') renderLook();
   renderHeader(); window.scrollTo(0,0);
 }
 function renderHeader(){
